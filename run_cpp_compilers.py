@@ -216,7 +216,7 @@ class TestConfig(NamedTuple):
 	pound_defines: list
 	output_file_name_suffix: str
 
-def generate_dissasembly_files(compiler_configs, cpp_file_name, include_directories, output_directory, test_configs):
+def generate_disassembly_files(compiler_configs, cpp_file_name, include_directories, output_directory, test_configs):
 	for compiler_config in compiler_configs:
 		compiler_name = compiler_config.compiler_name
 		for test_config in test_configs:
