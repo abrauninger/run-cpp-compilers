@@ -207,3 +207,26 @@ def generate_disassembly(compiler_name, cpp_file_name, disasm_file_name, include
 			lines = disasm.readlines()
 			write_cleaned_disasm(output_file=cleaned_disasm, lines=lines, root_function_names=root_function_names)
 
+class CompilerConfig(NamedTuple):
+	compiler_name: str
+	command_line_flags: str
+	root_function_names: str
+
+class TestConfig(NamedTuple):
+	pound_defines: list
+	output_file_name_suffix: str
+
+def generate_dissasembly_files(compiler_configs, cpp_file_name, include_directories, output_directory, test_configs):
+	for compiler_config in compiler_configs:
+		compiler_name = compiler_config.compiler_name
+		for test_config in test_configs:
+			disasm_file_name = os.path.join(output_directory, compiler_name + '-' + test_config.output_file_name_suffix)
+
+			generate_disassembly(
+				compiler_name,
+				cpp_file_name,
+				disasm_file_name,
+				include_directories,
+				pound_defines=test_config.pound_defines,
+				additional_compiler_options=compiler_config.command_line_flags,
+				root_function_names=compiler_config.root_function_names)
