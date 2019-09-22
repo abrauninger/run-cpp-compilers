@@ -6,11 +6,11 @@ from typing import NamedTuple
 
 class FunctionDefinition(NamedTuple):
 	name: str
-	lineStartIndex: int
-	lineCount: int
+	line_start_index: int
+	line_count: int
 
 class Instruction(NamedTuple):
-	byteOffset: str
+	byte_offset: str
 	operation: str
 	operands: str
 
@@ -23,187 +23,187 @@ class CleanedFunction(NamedTuple):
 	name: str
 	instructions: list
 
-def parseInstruction(line):
+def parse_instruction(line):
 	m = re.search('^\\s*(\\S+):\\s+(\\S+)\\s*(.*?)$', line)
 	if (m):
 		return Instruction(m.group(1), m.group(2), m.group(3))
 	else:
 		return None
 
-def getFunctionDefinitions(lines):
+def get_function_definitions(lines):
 	# Scan through the 'dumpbin' output and identify function definitions.
 	definitions = []
-	lineIndex = 0
+	line_index = 0
 
-	while (lineIndex < len(lines)):
-		m1 = re.search('^(.*):\\s*$', lines[lineIndex])
+	while (line_index < len(lines)):
+		m1 = re.search('^(.*):\\s*$', lines[line_index])
 		if (m1):
 			# We're in a function definition.
-			functionName = m1.group(1)
-			shortName = functionName
+			function_name = m1.group(1)
+			short_name = function_name
 
-			m2 = re.search('^(\\S+)\\s+\\(.*\\)$', functionName)
+			m2 = re.search('^(\\S+)\\s+\\(.*\\)$', function_name)
 			if (m2):
-				shortName = m2.group(1)
+				short_name = m2.group(1)
 
-			lineStartIndex = lineIndex;
-			lineIndex += 1
+			line_start_index = line_index;
+			line_index += 1
 
-			while (lineIndex < len(lines)):
-				if (parseInstruction(lines[lineIndex]) == None):
+			while (line_index < len(lines)):
+				if (parse_instruction(lines[line_index]) == None):
 					# We've reached the end of the function definition.
-					lineCount = lineIndex - lineStartIndex
-					definitions.append(FunctionDefinition(shortName, lineStartIndex, lineCount))
+					line_count = line_index - line_start_index
+					definitions.append(FunctionDefinition(short_name, line_start_index, line_count))
 					break;
-				lineIndex += 1
+				line_index += 1
 
-		lineIndex += 1
+		line_index += 1
 
 	return definitions
 
-def findFunctionDefinition(functionDefinitions, name):
-	return next((definition for definition in functionDefinitions if definition.name == name), None)
+def find_function_definition(function_definitions, name):
+	return next((definition for definition in function_definitions if definition.name == name), None)
 
-def getUsedFunctions(lines, functionDefinitions, usedFunctions, currentFunctionNames):
-	for currentFunctionName in currentFunctionNames:
-		if (findFunctionDefinition(usedFunctions, currentFunctionName)):
+def get_used_functions(lines, function_definitions, used_functions, current_function_names):
+	for current_function_name in current_function_names:
+		if (find_function_definition(used_functions, current_function_name)):
 			return
-		d = findFunctionDefinition(functionDefinitions, currentFunctionName)
+		d = find_function_definition(function_definitions, current_function_name)
 		if (d):
-			usedFunctions.append(d)
-			for lineIndex in range(d.lineStartIndex + 1, d.lineStartIndex + d.lineCount):
-				instruction = parseInstruction(lines[lineIndex])
+			used_functions.append(d)
+			for line_index in range(d.line_start_index + 1, d.line_start_index + d.line_count):
+				instruction = parse_instruction(lines[line_index])
 				if (instruction.operation == 'call'):
-					getUsedFunctions(lines, functionDefinitions, usedFunctions, [instruction.operands])
+					get_used_functions(lines, function_definitions, used_functions, [instruction.operands])
 
-def isJump(operation):
+def is_jump(operation):
 	return operation.startswith('j')
 
-def getCleanedFunction(lines, function, nextLabelIndex):
-	instructionPairs = []
-	for lineIndex in range(function.lineStartIndex + 1, function.lineStartIndex + function.lineCount):
-		instruction = parseInstruction(lines[lineIndex])
-		cleanedInstruction = CleanedInstruction(None, instruction.operation, instruction.operands)
-		instructionPairs.append((instruction, cleanedInstruction))
-	for index in range(len(instructionPairs)):
-		rawInstruction = instructionPairs[index][0]
-		if (isJump(rawInstruction.operation)):
-			targetByteOffset = rawInstruction.operands
-			targetInstructionIndex = None
-			for targetIndex in range(len(instructionPairs)):
-				rawTargetInstruction = instructionPairs[targetIndex][0]
-				if (rawTargetInstruction.byteOffset == targetByteOffset):
-					oldCleanedInstruction = instructionPairs[index][1]
-					oldCleanedTargetInstruction = instructionPairs[targetIndex][1]
+def get_cleaned_function(lines, function, next_label_index):
+	instruction_pairs = []
+	for line_index in range(function.line_start_index + 1, function.line_start_index + function.line_count):
+		instruction = parse_instruction(lines[line_index])
+		cleaned_instruction = CleanedInstruction(None, instruction.operation, instruction.operands)
+		instruction_pairs.append((instruction, cleaned_instruction))
+	for index in range(len(instruction_pairs)):
+		raw_instruction = instruction_pairs[index][0]
+		if (is_jump(raw_instruction.operation)):
+			target_byte_offset = raw_instruction.operands
+			target_instruction_index = None
+			for target_index in range(len(instruction_pairs)):
+				raw_target_instruction = instruction_pairs[target_index][0]
+				if (raw_target_instruction.byte_offset == target_byte_offset):
+					old_cleaned_instruction = instruction_pairs[index][1]
+					old_cleaned_target_instruction = instruction_pairs[target_index][1]
 
-					if (oldCleanedTargetInstruction.label != None):
-						label = oldCleanedTargetInstruction.label
-						newCleanedTargetInstruction = oldCleanedTargetInstruction
+					if (old_cleaned_target_instruction.label != None):
+						label = old_cleaned_target_instruction.label
+						new_cleaned_target_instruction = old_cleaned_target_instruction
 					else:
-						label = f'$L{nextLabelIndex}'
-						nextLabelIndex += 1
-						newCleanedTargetInstruction = CleanedInstruction(label, oldCleanedTargetInstruction.operation, oldCleanedTargetInstruction.operands)
+						label = f'$L{next_label_index}'
+						next_label_index += 1
+						new_cleaned_target_instruction = CleanedInstruction(label, old_cleaned_target_instruction.operation, old_cleaned_target_instruction.operands)
 					
-					newCleanedInstruction = CleanedInstruction(oldCleanedInstruction.label, oldCleanedInstruction.operation, label)
+					new_cleaned_instruction = CleanedInstruction(old_cleaned_instruction.label, old_cleaned_instruction.operation, label)
 					
-					instructionPairs[index] = (rawInstruction, newCleanedInstruction)
-					instructionPairs[targetIndex] = (rawTargetInstruction, newCleanedTargetInstruction)
+					instruction_pairs[index] = (raw_instruction, new_cleaned_instruction)
+					instruction_pairs[target_index] = (raw_target_instruction, new_cleaned_target_instruction)
 
 					break
-	cleanedInstructions = map(lambda pair: pair[1], instructionPairs)
-	return CleanedFunction(function.name, cleanedInstructions);
+	cleaned_instructions = map(lambda pair: pair[1], instruction_pairs)
+	return CleanedFunction(function.name, cleaned_instructions);
 
-def getCleanedFunctions(lines, functionDefinitions, usedFunctions):
-	nextLabelIndex = 0
-	cleanedFunctions = []
+def get_cleaned_functions(lines, function_definitions, used_functions):
+	next_label_index = 0
+	cleaned_functions = []
 
-	for functionDefinition in functionDefinitions:
-		function = findFunctionDefinition(usedFunctions, functionDefinition.name)
+	for functionDefinition in function_definitions:
+		function = find_function_definition(used_functions, functionDefinition.name)
 		if (function):
-			cleanedFunctions.append(getCleanedFunction(lines, function, nextLabelIndex))
-	return cleanedFunctions
+			cleaned_functions.append(get_cleaned_function(lines, function, next_label_index))
+	return cleaned_functions
 
-def writeCleanedFunction(outputFile, cleanedFunction):
-	outputFile.write(f'{cleanedFunction.name}:\n')
-	for instruction in cleanedFunction.instructions:
+def write_cleaned_function(output_file, cleaned_function):
+	output_file.write(f'{cleaned_function.name}:\n')
+	for instruction in cleaned_function.instructions:
 		if (instruction.label):
-			outputFile.write(f'{instruction.label}:\n')
-		outputFile.write(f'  {instruction.operation}')
+			output_file.write(f'{instruction.label}:\n')
+		output_file.write(f'  {instruction.operation}')
 		for index in range(12 - len(instruction.operation)):
-			outputFile.write(' ')
-		outputFile.write(f'{instruction.operands}\n')
-	outputFile.write('\n')
+			output_file.write(' ')
+		output_file.write(f'{instruction.operands}\n')
+	output_file.write('\n')
 
-def fileNameWithoutExtension(fileName):
-	return os.path.splitext(os.path.basename(fileName))[0]
+def file_name_without_extension(file_name):
+	return os.path.splitext(os.path.basename(file_name))[0]
 
-def writeCleanedDisasm(outputFile, lines, rootFunctionNames):
-	definitions = getFunctionDefinitions(lines)
-	usedFunctions = []
-	getUsedFunctions(lines, definitions, usedFunctions, rootFunctionNames)
-	cleanedFunctions = getCleanedFunctions(lines, definitions, usedFunctions)
-	for cleanedFunction in cleanedFunctions:
-		writeCleanedFunction(outputFile, cleanedFunction)
+def write_cleaned_disasm(output_file, lines, root_function_names):
+	definitions = get_function_definitions(lines)
+	used_functions = []
+	get_used_functions(lines, definitions, used_functions, root_function_names)
+	cleaned_functions = get_cleaned_functions(lines, definitions, used_functions)
+	for cleaned_function in cleaned_functions:
+		write_cleaned_function(output_file, cleaned_function)
 
-def printCommand(cmdParts):
-	for cmdPart in cmdParts:
-		print(cmdPart, end=' ')
+def print_command(cmd_parts):
+	for cmd_part in cmd_parts:
+		print(cmd_part, end=' ')
 	print('')
 
-def compilerExeName(compilerName):
-	if (compilerName == 'msvc'):
+def compiler_exe_name(compiler_name):
+	if (compiler_name == 'msvc'):
 		return 'cl'
-	elif (compilerName == 'clang'):
+	elif (compiler_name == 'clang'):
 		return 'clang++'
-	elif (compilerName == 'gcc'):
+	elif (compiler_name == 'gcc'):
 		return 'g++'
 	else:
-		raise Exception(f'Unknown compiler name: {compilerName}')
+		raise Exception(f'Unknown compiler name: {compiler_name}')
 
-def outputFileOptions(compilerName, objDir, objFileName):
-	if (compilerName == 'msvc'):
-		return [f'/Fo{objDir}\\'];
+def output_file_options(compiler_name, obj_dir, obj_file_name):
+	if (compiler_name == 'msvc'):
+		return [f'/Fo{obj_dir}\\'];
 	else:
-		return ['-o', f'{objDir}\\{objFileName}']
+		return ['-o', f'{obj_dir}\\{obj_file_name}']
 
-def generate_disassembly(compilerName, cppFileName, disasmFileName, includeDirectories, poundDefines, additionalCompilerOptions, rootFunctionNames):
-	cppFileNameWithoutExtension = fileNameWithoutExtension(cppFileName)
-	objFileName = f'{cppFileNameWithoutExtension}.obj'
+def generate_disassembly(compiler_name, cpp_file_name, disasm_file_name, include_directories, pound_defines, additional_compiler_options, root_function_names):
+	cpp_file_nameWithoutExtension = file_name_without_extension(cpp_file_name)
+	obj_file_name = f'{cpp_file_nameWithoutExtension}.obj'
 
-	with tempfile.TemporaryDirectory() as objDir:
-		cmdParts = [compilerExeName(compilerName)]
-		cmdParts += additionalCompilerOptions
+	with tempfile.TemporaryDirectory() as obj_dir:
+		cmd_parts = [compiler_exe_name(compiler_name)]
+		cmd_parts += additional_compiler_options
 
-		for includeDirectory in includeDirectories:
-			cmdParts.append('-I')
-			cmdParts.append(includeDirectory)
+		for include_directory in include_directories:
+			cmd_parts.append('-I')
+			cmd_parts.append(include_directory)
 
-		for poundDefine in poundDefines:
-			cmdParts.append('-D')
-			cmdParts.append(poundDefine)
+		for pound_define in pound_defines:
+			cmd_parts.append('-D')
+			cmd_parts.append(pound_define)
 
-		for outputFileOption in outputFileOptions(compilerName, objDir, objFileName):
-			cmdParts.append(outputFileOption)
+		for output_fileOption in output_file_options(compiler_name, obj_dir, obj_file_name):
+			cmd_parts.append(output_fileOption)
 
-		cmdParts.append('-c')
+		cmd_parts.append('-c')
 
-		cmdParts.append(cppFileName)
+		cmd_parts.append(cpp_file_name)
 
-		printCommand(cmdParts)
-		compilerResult = subprocess.run(cmdParts, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-		if (compilerResult.returncode != 0):
+		print_command(cmd_parts)
+		compiler_result = subprocess.run(cmd_parts, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+		if (compiler_result.returncode != 0):
 			print("!!!!!!!!!!!!!!")
 			print('COMPILE ERRORS')
 			print("!!!!!!!!!!!!!!")
 
 		with tempfile.TemporaryFile('r') as disasm:
-			dumpbinCmdParts = ['dumpbin', '/disasm:nobytes', f'{objDir}/{objFileName}']
-			printCommand(dumpbinCmdParts)
-			subprocess.run(dumpbinCmdParts, stdout=disasm)
+			dumpbin_cmd_parts = ['dumpbin', '/disasm:nobytes', f'{obj_dir}/{obj_file_name}']
+			print_command(dumpbin_cmd_parts)
+			subprocess.run(dumpbin_cmd_parts, stdout=disasm)
 
-			cleanedDisasm = open(disasmFileName, 'w')
+			cleaned_disasm = open(disasm_file_name, 'w')
 
 			disasm.seek(0)
 			lines = disasm.readlines()
-			writeCleanedDisasm(outputFile=cleanedDisasm, lines=lines, rootFunctionNames=rootFunctionNames)
+			write_cleaned_disasm(output_file=cleaned_disasm, lines=lines, root_function_names=root_function_names)
 
