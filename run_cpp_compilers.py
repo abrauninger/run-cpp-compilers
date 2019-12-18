@@ -160,13 +160,36 @@ def compiler_exe_name(compiler_name):
 	else:
 		raise Exception(f'Unknown compiler name: {compiler_name}')
 
+def version_option(compiler_name):
+	if (compiler_name == 'msvc'):
+		return None
+	else:
+		return '-v'
+
 def output_file_options(compiler_name, obj_dir, obj_file_name):
 	if (compiler_name == 'msvc'):
-		return [f'/Fo{obj_dir}\\'];
+		return [f'/Fo{obj_dir}\\']
 	else:
 		return ['-o', f'{obj_dir}\\{obj_file_name}']
 
+def write_compiler_version(compiler_name, cleaned_disasm):
+	cmd_parts = [compiler_exe_name(compiler_name)]
+	option = version_option(compiler_name)
+	if option:
+		cmd_parts.append(option)
+
+	print_command(cmd_parts)
+	result = subprocess.run(cmd_parts, stdout=cleaned_disasm, stderr=cleaned_disasm)
+	if (result.returncode != 0):
+		print(f'Unable to determine compiler version for {compiler_name}')
+	else:
+		cleaned_disasm.write('\n')
+
 def generate_disassembly(compiler_name, cpp_file_name, disasm_file_name, include_directories, pound_defines, additional_compiler_options, root_function_names):
+	cleaned_disasm = open(disasm_file_name, 'w')
+
+	write_compiler_version(compiler_name, cleaned_disasm)
+
 	cpp_file_nameWithoutExtension = file_name_without_extension(cpp_file_name)
 	obj_file_name = f'{cpp_file_nameWithoutExtension}.obj'
 
@@ -200,8 +223,6 @@ def generate_disassembly(compiler_name, cpp_file_name, disasm_file_name, include
 			dumpbin_cmd_parts = ['dumpbin', '/disasm:nobytes', f'{obj_dir}/{obj_file_name}']
 			print_command(dumpbin_cmd_parts)
 			subprocess.run(dumpbin_cmd_parts, stdout=disasm)
-
-			cleaned_disasm = open(disasm_file_name, 'w')
 
 			disasm.seek(0)
 			lines = disasm.readlines()
